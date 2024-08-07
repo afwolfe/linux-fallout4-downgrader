@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-
 USERNAME_TMP_FILE="/tmp/steamcmd_username"
-GAME_DIR=""
 
 DEPOT_BASE_CONTENT_A="377160 377161 7497069378349273908"
 DEPOT_BASE_EXECUTABLE="377160 377162 5847529232406005096"
@@ -27,21 +25,26 @@ DEPOT_LOCALE_RU_BASE="377160 393881 4735225695214536532"
 DEPOT_LOCALE_RU_AUTOMATRON="377160 435877 2675794883952625475"
 
 function get_username() {
-  if [[ -f $USERNAME_TMP_FILE ]]; then
-    cat $USERNAME_TMP_FILE 
+  if [[ -z $STEAM_USERNAME ]]; then
+    if [[ -f $USERNAME_TMP_FILE ]]; then
+      cat $USERNAME_TMP_FILE 
+    else
+      read -p "Enter your Steam username: " username 
+      echo "$username" > $USERNAME_TMP_FILE
+      echo "$username"
+    fi
   else
-    read -p "Enter your Steam username: " username 
-    echo "$username" > $USERNAME_TMP_FILE
-    echo $username
+    # Allow predefined USERNAME
+    echo "$STEAM_USERNAME"
   fi
 }
 
 function authenticate() {
-  steamcmd +login $1 +quit
+  steamcmd +login "$1" +quit
 }
 
 function is_authenticated() {
-  result=$(steamcmd +login $1 +info +quit | grep "Logged On")
+  result=$(steamcmd +login "$1" +info +quit | grep "Logged On")
 
   if [[ -z $result ]]; then
     echo false
@@ -52,83 +55,89 @@ function is_authenticated() {
 
 function download_depots() {
   cmd="steamcmd +login $(get_username)"
-  owns_automatron=0
 
   cmd="$cmd +download_depot $DEPOT_BASE_CONTENT_A"
   cmd="$cmd +download_depot $DEPOT_BASE_EXECUTABLE"
   cmd="$cmd +download_depot $DEPOT_BASE_CONTENT_B"
   cmd="$cmd +download_depot $DEPOT_WASTELAND_WORKSHOP"
 
-  read -p "Do you own the automatron DLC? (y/n): " answer
-  if [[ $answer == "y" ]]; then
-    owns_automatron=1
+  # Allows OWNS_AUTOMATRON to be set ahead of time
+  if [[ -z $OWNS_AUTOMATRON ]]; then
+    OWNS_AUTOMATRON=0
+    read -p "Do you own the automatron DLC? (y/n): " answer
+    if [[ $answer == "y" ]]; then
+      OWNS_AUTOMATRON=1
+    fi
+  fi 
+
+  if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
     cmd="$cmd +download_depot $DEPOT_AUTOMATRON"
   fi
 
-  echo "Available locales:"
-  echo "en: English"
-  echo "es: Spanish"
-  echo "fr: French"
-  echo "de: German"
-  echo "it: Italian"
-  echo "ja: Japanese"
-  echo "pt: Portuguese"
-  echo "ru: Russian"
+  if [[ -z $LOCALE_CODE ]]; then
+    echo "Available locales:"
+    echo "en: English"
+    echo "es: Spanish"
+    echo "fr: French"
+    echo "de: German"
+    echo "it: Italian"
+    echo "ja: Japanese"
+    echo "pt: Portuguese"
+    echo "ru: Russian"
 
-  read -p "Which locale do you want to download?: " locale
+    read -p "Which locale do you want to download?: " locale
 
-  locale_code=$(echo $locale | tr '[:lower:]' '[:upper:]')
-  depot=$(eval echo $(echo "\$DEPOT_LOCALE_${locale_code}_BASE"))
+    LOCALE_CODE=$(echo "$locale" | tr '[:lower:]' '[:upper:]')
+  fi
 
-
-  case $locale in
+  case $LOCALE_CODE in
     en)
       cmd="$cmd +download_depot $DEPOT_LOCALE_EN_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_EN_AUTOMATRON"
       fi
       ;;
     es)
       cmd="$cmd +download_depot $DEPOT_LOCALE_ES_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_ES_AUTOMATRON"
       fi
       ;;
 
     fr)
       cmd="$cmd +download_depot $DEPOT_LOCALE_FR_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_FR_AUTOMATRON"
       fi
       ;;
 
     de)
       cmd="$cmd +download_depot $DEPOT_LOCALE_DE_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_DE_AUTOMATRON"
       fi
       ;;
     it)
       cmd="$cmd +download_depot $DEPOT_LOCALE_IT_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_IT_AUTOMATRON"
       fi
       ;;
     ja)
       cmd="$cmd +download_depot $DEPOT_LOCALE_JA_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_JA_AUTOMATRON"
       fi
       ;;
     pt)
       cmd="$cmd +download_depot $DEPOT_LOCALE_PT_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_PT_AUTOMATRON"
       fi
       ;;
     ru)
       cmd="$cmd +download_depot $DEPOT_LOCALE_RU_BASE"
-      if [[ $owns_automatron -eq 1 ]]; then
+      if [[ $OWNS_AUTOMATRON -eq 1 ]]; then
         cmd="$cmd +download_depot $DEPOT_LOCALE_RU_AUTOMATRON"
       fi
       ;;
@@ -141,49 +150,55 @@ function download_depots() {
   cmd="$cmd +quit"
 
   echo "Executing Steam command:"
-  echo $cmd; eval $cmd
+  echo "$cmd"
+  eval "$cmd"
 }
 
 function apply_patches() {
-  if [[ -z $GAME_DIR ]]; then
-    echo "Game directory not found. Exiting."
+  CONTENT_DIR="$HOME/.steam/steamcmd/linux32/steamapps/content"
+  if [ ! -d "$CONTENT_DIR/app_377160" ]; then
+    echo "Could not find content/patches in $CONTENT_DIR/app_377160"
     exit 1
   fi
-  CONTENT_DIR="$HOME/.steam/steamcmd/linux32/steamapps/content"
-
-  cd $CONTENT_DIR/app_377160
+  cd "$CONTENT_DIR/app_377160" || exit 1
 
   # It is important that depot_377163 is copied last for the textures
   # luckily the files will be ordered by name so this is not a problem
   for dir in *; do
-    cp -vrf $dir/* $GAME_DIR
+    cp -vrf "$dir"/* "$STEAM_APP_PATH"
   done
+
 }
 
 function reverse_next_gen_changes() {
-  if [[ -z $GAME_DIR ]]; then
-    echo "Game directory not found. Exiting."
-    exit 1
-  fi
 
-  cd $GAME_DIR
+  cd "$STEAM_APP_PATH" || exit 1
   rm -vf Data/cc*
   rm -vf Fallout4IDs.ccc
 }
 
-function find_game_dir() {
-  read -p "Do you want to find the game directory automatically? (y/n): " answer
-  if [[ $answer == "y" ]]; then
-    game_dir=$(find / -type f -name "Fallout4.exe" -exec dirname {} \; -quit)
-    read -p "Game executable found at: $game_dir. Is this correct? (y/n): " answer
+function find_steam_app_path() {
+  if [[ -z $STEAM_APP_PATH ]]; then
+    read -p "Do you want to find the game directory automatically? (y/n): " answer
     if [[ $answer == "y" ]]; then
-      GAME_DIR=$game_dir
+      game_dir=$(find / -type f -name "Fallout4.exe" -exec dirname {} \; -quit)
+      read -p "Game executable found at: $game_dir. Is this correct? (y/n): " answer
+      if [[ $answer == "y" ]]; then
+        STEAM_APP_PATH=$game_dir
+      else
+        find_game_dir
+      fi
     else
-      find_game_dir
+      read -p "Enter the Fallout 4 installation path: " game_dir
+      STEAM_APP_PATH=$game_dir
     fi
   else
-    read -p "Enter the fallout 4 installtion path: " game_dir
-    GAME_DIR=$game_dir
+    # Allow pre-defined STEAM_APP_PATH to be provided
+    echo "STEAM_APP_PATH=$STEAM_APP_PATH"
+  fi
+  if [[ ! -d "$STEAM_APP_PATH" ]]; then
+    echo "Game directory not found. Exiting."
+    exit 1
   fi
 }
 
