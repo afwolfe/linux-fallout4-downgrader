@@ -186,7 +186,7 @@ function find_steam_app_path() {
       if [[ $answer == "y" ]]; then
         STEAM_APP_PATH=$game_dir
       else
-        find_game_dir
+        find_steam_app_path
       fi
     else
       read -p "Enter the Fallout 4 installation path: " game_dir
@@ -202,7 +202,7 @@ function find_steam_app_path() {
   fi
 }
 
-find_game_dir
+find_steam_app_path
 
 if [[ $(type -P "steamcmd") ]]; then
   username=$(get_username)
