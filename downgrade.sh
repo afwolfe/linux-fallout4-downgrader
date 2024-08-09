@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 USERNAME_TMP_FILE="/tmp/steamcmd_username"
+STEAMCMD_STEAMROOT="${STEAMCMD_STEAMROOT:-$HOME/.steam/steamcmd}"
 
 DEPOT_BASE_CONTENT_A="377160 377161 7497069378349273908"
 DEPOT_BASE_EXECUTABLE="377160 377162 5847529232406005096"
@@ -37,10 +38,6 @@ function get_username() {
     # Allow predefined USERNAME
     echo "$STEAM_USERNAME"
   fi
-}
-
-function authenticate() {
-  steamcmd +login "$1" +quit
 }
 
 function is_authenticated() {
@@ -155,7 +152,7 @@ function download_depots() {
 }
 
 function apply_patches() {
-  CONTENT_DIR="$HOME/.steam/steamcmd/linux32/steamapps/content"
+  CONTENT_DIR="$STEAMCMD_STEAMROOT/linux32/steamapps/content"
   if [ ! -d "$CONTENT_DIR/app_377160" ]; then
     echo "Could not find content/patches in $CONTENT_DIR/app_377160"
     exit 1
